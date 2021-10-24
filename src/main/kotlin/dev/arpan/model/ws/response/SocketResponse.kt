@@ -37,6 +37,8 @@ sealed class SocketResponse {
     @JsonClass(generateAdapter = true)
     data class Conversation(
         @Json(name = "c_id") val id: Int,
+        @Json(name = "l_msg") val lastMessage: Message?,
+        @Json(name = "l_msg_sender") val lastMessageSender: Sender?,
         @Json(name = "ts") val createdAt: Long
     )
 
@@ -69,3 +71,9 @@ sealed class SocketResponse {
         @Json(name = "success") val success: Boolean
     ) : SocketResponse()
 }
+
+@JsonClass(generateAdapter = true)
+data class Sender(
+    @Json(name = "s_id") val senderId: Int,
+    @Json(name = "s_name") val senderName: String
+)

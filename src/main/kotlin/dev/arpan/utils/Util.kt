@@ -1,7 +1,7 @@
 package dev.arpan.utils
 
 import dev.arpan.Inject
-import dev.arpan.model.ws.request.SocketCommand
+import dev.arpan.model.ws.command.SocketCommand
 import io.ktor.http.cio.websocket.Frame
 import io.ktor.http.cio.websocket.readText
 

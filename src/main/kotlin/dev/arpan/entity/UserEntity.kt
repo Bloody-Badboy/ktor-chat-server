@@ -12,5 +12,6 @@ class UserEntity(uuid: EntityID<Int>) : IntEntity(uuid) {
     var email by Users.email
     var password by Users.password
     var isOnline by Users.isOnline
+    var isAdmin by Users.isAdmin
     var createdAt by Users.createdAt
 }

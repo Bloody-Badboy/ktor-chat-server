@@ -9,5 +9,6 @@ class ConversationEntity(id: EntityID<Int>) : IntEntity(id) {
     companion object : IntEntityClass<ConversationEntity>(Conversations)
 
     var owner by UserEntity referencedOn Conversations.owner
+    var lastMessage by MessageEntity optionalReferencedOn Conversations.lastMessage
     var createdAt by Conversations.createdAt
 }

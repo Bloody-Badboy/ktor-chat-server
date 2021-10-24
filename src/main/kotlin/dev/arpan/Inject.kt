@@ -2,7 +2,7 @@ package dev.arpan
 
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.adapters.PolymorphicJsonAdapterFactory
-import dev.arpan.model.ws.request.SocketCommand
+import dev.arpan.model.ws.command.SocketCommand
 import dev.arpan.model.ws.response.SocketResponse
 
 object Inject {
@@ -14,6 +14,7 @@ object Inject {
                 .withSubtype(SocketCommand.ConversationMessage::class.java, "msg")
                 .withSubtype(SocketCommand.SubscribeConversation::class.java, "conv_sub")
                 .withSubtype(SocketCommand.UnsubscribeConversation::class.java, "conv_unsub")
+                .withSubtype(SocketCommand.NewConversation::class.java, "conv_new")
         )
         .add(
             PolymorphicJsonAdapterFactory.of(SocketCommand.Message::class.java, Constants.MESSAGE_TYPE_KEY)
@@ -28,6 +29,7 @@ object Inject {
                 .withSubtype(SocketResponse.ConversationMessage::class.java, "msg")
                 .withSubtype(SocketResponse.SubscribeAck::class.java, "subscribe_ack")
                 .withSubtype(SocketResponse.UnsubscribeAck::class.java, "unsubscribe_ack")
+
         )
         .add(
             PolymorphicJsonAdapterFactory.of(SocketResponse.Message::class.java, Constants.MESSAGE_TYPE_KEY)
@@ -37,5 +39,5 @@ object Inject {
         )
         .build()
 
-    fun provideMoshi() = moshi
+    fun provideMoshi(): Moshi = moshi
 }

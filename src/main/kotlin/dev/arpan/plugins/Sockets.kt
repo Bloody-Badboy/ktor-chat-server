@@ -3,7 +3,8 @@ package dev.arpan.plugins
 import dev.arpan.entity.ConversationEntity
 import dev.arpan.entity.KeyStoreEntity
 import dev.arpan.entity.MessageEntity
-import dev.arpan.model.ws.request.SocketCommand
+import dev.arpan.model.ws.command.SocketCommand
+import dev.arpan.model.ws.response.Sender
 import dev.arpan.model.ws.response.SocketResponse
 import dev.arpan.table.Conversations
 import dev.arpan.table.KeyStores
@@ -36,8 +37,6 @@ fun Application.configureSockets() {
         masking = false
     }
 
-
-
     routing {
         webSocket("/loopback") {
             try {
@@ -62,10 +61,11 @@ fun Application.configureSockets() {
                 val userEntity = transaction {
                     keyStoreEntity.user
                 }
-                val connection = ConnectionManager.Connection(session = this)
+                val connection = ConnectionManager.Connection(session = this, userId = userEntity.id.value)
                 ConnectionManager.connections += connection
                 println("Adding ${userEntity.fullName}!")
 
+                send(Frame.Text("Hello ${userEntity.fullName}!, Welcome to chat server."))
 
                 transaction {
                     userEntity.isOnline = true
@@ -80,7 +80,14 @@ fun Application.configureSockets() {
                                     }.map {
                                         SocketResponse.Conversation(
                                             id = it.id.value,
-                                            createdAt = it.createdAt.toEpochSecond(ZoneOffset.UTC)
+                                            createdAt = it.createdAt.toEpochSecond(ZoneOffset.UTC),
+                                            lastMessage = it.lastMessage?.toMessageResponse(),
+                                            lastMessageSender = it.lastMessage?.sender?.let { sender ->
+                                                Sender(
+                                                    senderId = sender.id.value,
+                                                    senderName = sender.fullName
+                                                )
+                                            }
                                         )
                                     }
                                 }
@@ -96,12 +103,7 @@ fun Application.configureSockets() {
                                     MessageEntity.find {
                                         Messages.conversation eq request.conversationId
                                     }.map { entity ->
-                                        SocketResponse.Message.Text(
-                                            messageId = entity.id.value,
-                                            message = entity.message.orEmpty(),
-                                            senderId = entity.sender.id.value,
-                                            timestamp = entity.timestamp.toEpochSecond(ZoneOffset.UTC)
-                                        )
+                                        entity.toMessageResponse()
                                     }
                                 }
 
@@ -111,9 +113,23 @@ fun Application.configureSockets() {
                                     )
                                 )
                             }
+                            is SocketCommand.NewConversation -> {
+                                transaction {
+                                    ConversationEntity.new {
+                                        owner = userEntity
+                                    }.run {
+                                        SocketResponse.Conversation(
+                                            id = id.value,
+                                            createdAt = createdAt.toEpochSecond(ZoneOffset.UTC),
+                                            lastMessage = null,
+                                            lastMessageSender = null
+                                        )
+                                    }
+                                }
+                            }
                             is SocketCommand.SubscribeConversation -> {
                                 // TODO add validation before subscribing
-                                connection.subscribedConversationId = request.conversationId
+                                connection.subConversationId = request.conversationId
                                 sendResponse(
                                     response = SocketResponse.SubscribeAck(
                                         conversationId = request.conversationId,
@@ -122,7 +138,7 @@ fun Application.configureSockets() {
                                 )
                             }
                             is SocketCommand.UnsubscribeConversation -> {
-                                connection.subscribedConversationId = null
+                                connection.subConversationId = null
                                 sendResponse(
                                     response = SocketResponse.UnsubscribeAck(
                                         conversationId = request.conversationId,
@@ -137,6 +153,7 @@ fun Application.configureSockets() {
                                 if (conversationEntity != null) {
                                     val message = transaction {
                                         when (val msg = request.message) {
+
                                             is SocketCommand.Message.Media -> {
 
                                                 MessageEntity.new {
@@ -147,6 +164,7 @@ fun Application.configureSockets() {
                                                     mediaUrl = msg.mediaUrl
                                                     mediaMimeType = msg.mediaType
                                                 }.run {
+                                                    conversationEntity.lastMessage = this
                                                     SocketResponse.Message.Media(
                                                         messageId = id.value,
                                                         senderId = sender.id.value,
@@ -166,6 +184,7 @@ fun Application.configureSockets() {
                                                     latitude = msg.latitude
                                                     longitude = msg.longitude
                                                 }.run {
+                                                    conversationEntity.lastMessage = this
                                                     SocketResponse.Message.Location(
                                                         messageId = id.value,
                                                         senderId = sender.id.value,
@@ -183,6 +202,7 @@ fun Application.configureSockets() {
                                                     message = msg.message
                                                     messageType = MessageType.TEXT
                                                 }.run {
+                                                    conversationEntity.lastMessage = this
                                                     SocketResponse.Message.Text(
                                                         messageId = id.value,
                                                         message = message.orEmpty(),
@@ -193,11 +213,7 @@ fun Application.configureSockets() {
                                             }
                                         }
                                     }
-                                    ConnectionManager.connections.filter { con ->
-                                        con.subscribedConversationId == conversationEntity.id.value
-                                    }.map { it.session }.forEach { session ->
-                                        session.sendResponse(SocketResponse.ConversationMessage(message))
-                                    }
+                                    ConnectionManager.publishMessageToSubscribedUsers(conversationEntity, message)
                                 }
                             }
                         }
@@ -225,6 +241,6 @@ private suspend inline fun DefaultWebSocketServerSession.closeUnauthorized() {
     )
 }
 
-private suspend inline fun DefaultWebSocketServerSession.sendResponse(response: SocketResponse) {
+suspend inline fun DefaultWebSocketServerSession.sendResponse(response: SocketResponse) {
     toJson(response)?.let { send(Frame.Text(it)) }
 }

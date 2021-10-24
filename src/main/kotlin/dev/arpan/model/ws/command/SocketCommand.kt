@@ -1,4 +1,4 @@
-package dev.arpan.model.ws.request
+package dev.arpan.model.ws.command
 
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
@@ -28,6 +28,9 @@ sealed class SocketCommand {
 
     @JsonClass(generateAdapter = true)
     class AllConversations : SocketCommand()
+
+    @JsonClass(generateAdapter = true)
+    class NewConversation : SocketCommand()
 
     @JsonClass(generateAdapter = true)
     data class AllMessages(

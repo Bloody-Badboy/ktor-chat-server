@@ -10,19 +10,22 @@ enum class MessageType {
     LOCATION;
 }
 
-object Messages : IntIdTable(name = "chat_messages") {
+object Messages : IntIdTable(name = "chat_messages", columnName = "_id") {
     val conversation = reference("conversation_id", Conversations)
     val sender = reference("sender_id", Users)
     val message = text("message").nullable()
+
     val messageType = customEnumeration(
         name = "message_type",
         sql = "ENUM ('TEXT', 'MEDIA', 'LOCATION')",
         fromDb = {
-            MessageType.values()[it as Int]
+            enumValueOf<MessageType>(it as String)
         },
         toDb = { type ->
             type.name
         })
+
+    // val messageType = customEnumeration<MessageType>("message_type")
     val mediaUrl = varchar("media_url", 256).nullable()
     val mediaName = varchar("media_name", 256).nullable()
     val mediaMimeType = varchar("media_mime_type", 256).nullable()
